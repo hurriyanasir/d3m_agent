@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap");
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0f0e0d;
+        --surface: #1a1916;
+        --border: #2e2c28;
+        --amber: #d4a853;
+        --amber-dim: #8a6830;
+        --text: #e8e2d6;
+        --muted: #6b6558;
+        --user-bg: #1f1e1a;
+        --agent-bg: #161512;
+        --code-bg: #121110;
+        --radius: 6px;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      body {
+        font-family: "DM Mono", monospace;
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ── Header ── */
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+      header .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 8px var(--amber);
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      header h1 {
+        font-family: "Fraunces", serif;
+        font-size: 17px;
+        font-weight: 300;
+        color: var(--amber);
+        letter-spacing: 0.04em;
+      }
+      header span {
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-left: auto;
+      }
+
+      /* ── Chat area ── */
+      #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 28px 0;
+        scroll-behavior: smooth;
+      }
+      #chat::-webkit-scrollbar {
+        width: 4px;
+      }
+      #chat::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #chat::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+
+      .message {
+        max-width: 820px;
+        margin: 0 auto 20px;
+        padding: 0 24px;
+        animation: fadeUp 0.25s ease both;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .role-tag {
+        font-size: 9px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-weight: 500;
+      }
+      .role-tag.user {
+        background: #2a2720;
+        color: var(--amber);
+        border: 1px solid var(--amber-dim);
+      }
+      .role-tag.agent {
+        background: #1a1e1a;
+        color: #7ab87a;
+        border: 1px solid #3a5a3a;
+      }
+
+      .bubble {
+        background: var(--agent-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 18px;
+        line-height: 1.75;
+        color: var(--text);
+      }
+      .user .bubble {
+        background: var(--user-bg);
+        border-color: #2e2c28;
+      }
+
+      /* Rendered markdown-ish text */
+      .bubble p {
+        margin-bottom: 0.75em;
+      }
+      .bubble p:last-child {
+        margin-bottom: 0;
+      }
+      .bubble strong {
+        color: var(--amber);
+        font-weight: 500;
+      }
+      .bubble em {
+        font-style: italic;
+        color: #b0a890;
+      }
+      .bubble code {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+
+      /* Section headers inside agent reply */
+      .section-label {
+        font-size: 9px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+        margin: 14px 0 10px;
+      }
+
+      /* ── Image grid ── */
+      .image-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .image-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--code-bg);
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+        cursor: pointer;
+      }
+      .image-card:hover {
+        border-color: var(--amber-dim);
+        transform: translateY(-2px);
+      }
+      .image-card img {
+        width: 100%;
+        display: block;
+        aspect-ratio: 4/3;
+        object-fit: cover;
+        background: #0a0908;
+      }
+      .image-card .img-caption {
+        padding: 8px 10px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.5;
+        border-top: 1px solid var(--border);
+      }
+
+      /* ── Lightbox ── */
+      #lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.88);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        gap: 16px;
+        cursor: zoom-out;
+      }
+      #lightbox.open {
+        display: flex;
+      }
+      #lightbox img {
+        max-width: 90vw;
+        max-height: 80vh;
+        object-fit: contain;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      #lightbox p {
+        color: var(--muted);
+        font-size: 12px;
+        max-width: 600px;
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      /* ── Thinking indicator ── */
+      .thinking {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        padding: 10px 18px;
+        letter-spacing: 0.06em;
+      }
+      .thinking-dots span {
+        display: inline-block;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--amber-dim);
+        animation: blink 1.2s ease-in-out infinite;
+      }
+      .thinking-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .thinking-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+          transform: scale(0.8);
+        }
+        40% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+
+      /* ── Input bar ── */
+      footer {
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+        padding: 16px 24px;
+        flex-shrink: 0;
+      }
+      .input-row {
+        max-width: 820px;
+        margin: 0 auto;
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+      textarea {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+        font-size: 13px;
+        padding: 10px 14px;
+        resize: none;
+        outline: none;
+        min-height: 42px;
+        max-height: 140px;
+        transition: border-color 0.2s;
+        line-height: 1.55;
+      }
+      textarea::placeholder {
+        color: var(--muted);
+      }
+      textarea:focus {
+        border-color: var(--amber-dim);
+      }
+
+      button#send {
+        background: var(--amber);
+        color: #0f0e0d;
+        border: none;
+        border-radius: var(--radius);
+        padding: 10px 18px;
+        font-family: "DM Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          transform 0.1s;
+        white-space: nowrap;
+        height: 42px;
+      }
+      button#send:hover {
+        background: #e0b860;
+      }
+      button#send:active {
+        transform: scale(0.97);
+      }
+      button#send:disabled {
+        background: var(--amber-dim);
+        cursor: not-allowed;
+      }
+
+      /* ── Session config ── */
+      #config {
+        max-width: 820px;
+        margin: 0 auto 8px;
+        display: flex;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--muted);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      #config input {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        padding: 4px 8px;
+        outline: none;
+        width: 140px;
+      }
+      #config input:focus {
+        border-color: var(--amber-dim);
+      }
+      .cfg-sep {
+        color: var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="dot"></div>
+      <h1>Agent</h1>
+      <span>Metallography · Microstructures</span>
+    </header>
+
+    <div id="chat"></div>
+
+    <div id="lightbox" onclick="closeLightbox()">
+      <img id="lb-img" src="" alt="" />
+      <p id="lb-caption"></p>
+    </div>
+
+    <footer>
+      <div id="config">
+        <span>User ID:</span>
+        <input id="userId" value="user_1" />
+        <span class="cfg-sep">|</span>
+        <span>Session:</span>
+        <input id="sessionId" value="" placeholder="auto" />
+      </div>
+      <div class="input-row">
+        <textarea
+          id="input"
+          placeholder="Ask about cast iron microstructures, graphite morphology, ductile iron…"
+          rows="1"
+        ></textarea>
+        <button id="send" onclick="sendMessage()">Send ↵</button>
+      </div>
+    </footer>
+
+    <script>
+      // ── CONFIG ──────────────────────────────────────────────────────────────────
+      const BASE_URL = window.location.origin; // same host as the server
+      const APP_NAME = "multi_tool_agent"; // must match your agent package folder
+
+      // ── STATE ───────────────────────────────────────────────────────────────────
+      let sessionId = null;
+
+      // ── INIT ─────────────────────────────────────────────────────────────────────
+      (async function init() {
+        await createSession();
+        addWelcome();
+      })();
+
+      async function createSession() {
+        const userId = document.getElementById("userId").value || "user_1";
+        const manualSession = document.getElementById("sessionId").value.trim();
+
+        if (manualSession) {
+          sessionId = manualSession;
+          return;
+        }
+
+        try {
+          const res = await fetch(
+            `${BASE_URL}/apps/${APP_NAME}/users/${userId}/sessions`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+            },
+          );
+          const data = await res.json();
+          sessionId = data.id || data.session_id || crypto.randomUUID();
+          document.getElementById("sessionId").value = sessionId;
+        } catch (e) {
+          sessionId = crypto.randomUUID();
+          document.getElementById("sessionId").value = sessionId;
+          console.warn(
+            "Could not create ADK session, using random ID:",
+            sessionId,
+          );
+        }
+      }
+
+      function addWelcome() {
+        appendMessage("agent", "Hello!");
+      }
+
+      // ── SEND ─────────────────────────────────────────────────────────────────────
+      async function sendMessage() {
+        const ta = document.getElementById("input");
+        const text = ta.value.trim();
+        if (!text) return;
+
+        ta.value = "";
+        ta.style.height = "auto";
+
+        appendMessage("user", text);
+        const thinkEl = appendThinking();
+
+        try {
+          const userId = document.getElementById("userId").value || "user_1";
+          const response = await fetch(`${BASE_URL}/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              app_name: APP_NAME,
+              user_id: userId,
+              session_id: sessionId,
+              new_message: { role: "user", parts: [{ text }] },
+            }),
+          });
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          // ADK /run returns a stream of SSE events or a JSON array depending on version.
+          const contentType = response.headers.get("content-type") || "";
+          let agentText = "";
+
+          if (contentType.includes("text/event-stream")) {
+            // SSE streaming
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = "";
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const lines = buf.split("\n");
+              buf = lines.pop();
+              for (const line of lines) {
+                if (!line.startsWith("data:")) continue;
+                try {
+                  const evt = JSON.parse(line.slice(5).trim());
+                  const part = evt?.content?.parts?.[0]?.text;
+                  if (part) agentText += part;
+                } catch {}
+              }
+            }
+          } else {
+            // JSON array fallback (older ADK versions)
+            const events = await response.json();
+            for (const evt of events) {
+              const part = evt?.content?.parts?.[0]?.text;
+              if (part && evt?.content?.role === "model") agentText += part;
+            }
+          }
+
+          thinkEl.remove();
+          if (agentText) {
+            appendMessage("agent", agentText);
+          } else {
+            appendMessage("agent", "_No response received from agent._");
+          }
+        } catch (err) {
+          thinkEl.remove();
+          appendMessage("agent", `⚠️ Error: ${err.message}`);
+        }
+      }
+
+      // ── RENDER ───────────────────────────────────────────────────────────────────
+      function appendMessage(role, rawText) {
+        const chat = document.getElementById("chat");
+        const wrap = document.createElement("div");
+        wrap.className = `message ${role}`;
+
+        const header = document.createElement("div");
+        header.className = "message-header";
+        const tag = document.createElement("span");
+        tag.className = `role-tag ${role}`;
+        tag.textContent = role === "user" ? "You" : "Agent";
+        header.appendChild(tag);
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = renderContent(rawText);
+
+        // Wire up image cards
+        bubble.querySelectorAll(".image-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            const src = card.dataset.src;
+            const cap = card.dataset.caption;
+            openLightbox(src, cap);
+          });
+        });
+
+        wrap.appendChild(header);
+        wrap.appendChild(bubble);
+        chat.appendChild(wrap);
+        chat.scrollTop = chat.scrollHeight;
+        return wrap;
+      }
+
+      function appendThinking() {
+        const chat = document.getElementById("chat");
+        const wrap = document.createElement("div");
+        wrap.className = "message agent";
+        const header = document.createElement("div");
+        header.className = "message-header";
+        const tag = document.createElement("span");
+        tag.className = "role-tag agent";
+        tag.textContent = "Agent";
+        header.appendChild(tag);
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = `<div class="thinking"><span class="thinking-dots"><span></span><span></span><span></span></span> Searching knowledge base…</div>`;
+        wrap.appendChild(header);
+        wrap.appendChild(bubble);
+        chat.appendChild(wrap);
+        chat.scrollTop = chat.scrollHeight;
+        return wrap;
+      }
+
+      /**
+       * Convert raw agent text into HTML.
+       * Handles:
+       *   - [[IMAGE:/images/foo.png]] → image card
+       *   - **bold**, *italic*, `code`, line breaks, === SECTION LABELS ===
+       */
+      function renderContent(text) {
+        // Split on [[IMAGE:...]] markers
+        const parts = text.split(/(\[\[IMAGE:[^\]]+\]\])/g);
+        const collectedImages = [];
+
+        let html = "";
+        let pendingText = "";
+
+        for (const part of parts) {
+          const imgMatch = part.match(/^\[\[IMAGE:([^\]]+)\]\]$/);
+          if (imgMatch) {
+            if (pendingText.trim()) {
+              html += renderText(pendingText);
+              pendingText = "";
+            }
+            collectedImages.push(imgMatch[1]);
+          } else {
+            pendingText += part;
+          }
+        }
+        if (pendingText.trim()) html += renderText(pendingText);
+
+        // Render collected images as a grid at the end (or inline if you prefer)
+        if (collectedImages.length > 0) {
+          html += `<div class="section-label">Relevant Micrographs</div>`;
+          html += `<div class="image-grid">`;
+          for (const src of collectedImages) {
+            const filename = src
+              .split("/")
+              .pop()
+              .replace(/-/g, " ")
+              .replace(".png", "")
+              .replace(".jpg", "");
+            html += `
+        <div class="image-card" data-src="${src}" data-caption="${escHtml(filename)}">
+          <img src="${src}" alt="${escHtml(filename)}"
+               onerror="this.style.background='#1a1916';this.alt='Image not found'" />
+          <div class="img-caption">${escHtml(filename)}</div>
+        </div>`;
+          }
+          html += `</div>`;
+        }
+
+        return html;
+      }
+
+      function renderText(raw) {
+        let t = escHtml(raw);
+
+        // === SECTION HEADER ===
+        t = t.replace(
+          /={3}\s*(.+?)\s*={3}/g,
+          '<div class="section-label">$1</div>',
+        );
+
+        // **bold**
+        t = t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        // *italic*
+        t = t.replace(/\*(.+?)\*/g, "<em>$1</em>");
+        // `code`
+        t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+        // Paragraphs (double newline)
+        t = t
+          .split(/\n{2,}/)
+          .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+          .join("");
+
+        return t;
+      }
+
+      function escHtml(s) {
+        return s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
+      function openLightbox(src, caption) {
+        document.getElementById("lb-img").src = src;
+        document.getElementById("lb-caption").textContent = caption;
+        document.getElementById("lightbox").classList.add("open");
+      }
+      function closeLightbox() {
+        document.getElementById("lightbox").classList.remove("open");
+      }
+
+      // ── Auto-resize textarea ──────────────────────────────────────────────────────
+      document.getElementById("input").addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 140) + "px";
+      });
+      document
+        .getElementById("input")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
+        });
+    </script>
+  </body>
+</html>
