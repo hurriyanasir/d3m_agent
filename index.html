@@ -488,6 +488,10 @@ function appendMessage(role, rawText) {
   wrap.appendChild(bubble);
   chat.appendChild(wrap);
   chat.scrollTop = chat.scrollHeight;
+
+  // Fetch images via blob to bypass ngrok browser warning page
+  loadImagesInBubble(bubble);
+
   return wrap;
 }
 
@@ -532,7 +536,7 @@ function renderContent(text) {
         html += renderText(pendingText);
         pendingText = "";
       }
-      collectedImages.push(imgMatch[1]);
+      collectedImages.push(imgMatch[1].trim());  // trim whitespace/newlines from agent output
     } else {
       pendingText += part;
     }
@@ -542,13 +546,13 @@ function renderContent(text) {
   // Render collected images as a grid at the end (or inline if you prefer)
   if (collectedImages.length > 0) {
     html += `<div class="section-label">Relevant Micrographs</div>`;
-    html += `<div class="image-grid">`;
+    html += `<div class="image-grid" id="grid-${Date.now()}">`;
     for (const src of collectedImages) {
       const filename = src.split("/").pop().replace(/-/g, " ").replace(".png","").replace(".jpg","");
+      const cardId = "img-" + Math.random().toString(36).slice(2);
       html += `
-        <div class="image-card" data-src="${BASE_URL + src}" data-caption="${escHtml(filename)}">
-          <img src="${BASE_URL + src}" alt="${escHtml(filename)}"
-               onerror="this.style.background='#1a1916';this.alt='Image not found'" />
+        <div class="image-card" id="${cardId}" data-src="${src}" data-caption="${escHtml(filename)}">
+          <img src="" alt="${escHtml(filename)}" data-url="${BASE_URL + src}" />
           <div class="img-caption">${escHtml(filename)}</div>
         </div>`;
     }
@@ -589,6 +593,29 @@ function openLightbox(src, caption) {
 }
 function closeLightbox() {
   document.getElementById("lightbox").classList.remove("open");
+}
+
+// ── Image blob loader (bypasses ngrok browser warning) ───────────────────────
+async function loadImagesInBubble(bubble) {
+  const imgs = bubble.querySelectorAll("img[data-url]");
+  await Promise.all([...imgs].map(async (img) => {
+    const url = img.dataset.url;
+    try {
+      const res = await fetch(url, {
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const blob = await res.blob();
+      img.src = URL.createObjectURL(blob);
+      // also update the parent card's data-src for lightbox
+      const card = img.closest(".image-card");
+      if (card) card.dataset.src = img.src;
+    } catch (e) {
+      img.alt = "Image not found";
+      img.style.background = "#1a1916";
+      console.warn("Failed to load image:", url, e.message);
+    }
+  }));
 }
 
 // ── Auto-resize textarea ──────────────────────────────────────────────────────
